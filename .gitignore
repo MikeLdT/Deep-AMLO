@@ -130,7 +130,7 @@ env.bak/
 venv.bak/
 
 # Yaml information
-src/footballYaml.yaml
+src/keys.yaml
 
 # Spyder project settings
 .spyderproject
