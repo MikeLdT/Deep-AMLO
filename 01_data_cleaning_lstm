@@ -1,0 +1,91 @@
+### LSTM Model
+### Data cleaning
+### Sergio Parra 
+### sergioparra10@gmail.com
+
+### Libraries ----
+
+paquetes<-c("tidyverse","lubridate","stringr","janitor","tm","openxlsx")
+
+sapply(paquetes,
+       function(x) {
+         if(!x %in% rownames(installed.packages()))
+           install.packages(x)
+         require(x, character.only=T)})
+rm(list=setdiff(ls(),c("")))
+
+setwd("~/Documents/ITAM/2_Semestre/DeepLearning/Classification_Model/")
+
+### Data 
+
+tweets <- read.xlsx("02_Input/Tuits_compilados.xlsx")
+sum(is.na(tweets$category))
+tweets <- tweets %>% 
+  dplyr::select(author_id,created_at,text2,category) %>% 
+  rename(text = text2) %>% 
+  drop_na(category) %>% 
+  mutate(original_text = text) %>% 
+  dplyr::select(author_id,created_at,original_text,text,category)
+
+# Data Cleansing
+
+stop_words_1 <-data.frame(word=stopwords(kind = "spanish"))
+stop_words_2 <- stop_words_1 # Without special characters such as accents.. 
+stop_words_2$word <- iconv(stop_words_2$word,from="UTF-8",to="ASCII//TRANSLIT")
+stop_words_2$word <- str_replace_all(stop_words_2$word, "'","") 
+stop_words_2$word <- str_replace_all(stop_words_2$word, "~","")
+stop_words_2$word <- str_replace_all(stop_words_2$word, "`","") 
+
+stop_words <- bind_rows(stop_words_1,stop_words_2) %>% 
+  distinct(word,.keep_all = TRUE)
+rm(stop_words_1,stop_words_2)
+
+# 1 Remove numbers, non-alphanumeric characters, double spaces, stopwords...
+
+tweets$text <- tolower(tweets$text) # lower-case
+tweets$text <- gsub("[^\\s]*@[^\\s]*","", tweets$text, perl=T) # remove user names 
+
+tweets$text <- gsub('[0-9]+', '',tweets$text) # remove numbers 
+tweets$text <- str_replace_all(tweets$text, "[^[:alnum:]]", " ") #swap out all non-alphanumeric characters
+tweets$text  <- gsub(paste0('\\b',stop_words$word, '\\b', # remove stopwords from list
+                                collapse = '|'), '', tweets$text )
+tweets$text <- str_replace_all(tweets$text, "  ", " ") # remove double spaces
+tweets$text <- str_replace_all(tweets$text, "  ", " ") # remove double spaces
+tweets$text <- str_replace_all(tweets$text, "  ", " ") # remove double spaces
+tweets$text <- str_trim(tweets$text) # remove spaces at the begginig and end of a text
+tweets$text[tweets$text==""] <- NA # Impute NA to characters without strings
+tweets$text[which(is.na(tweets$text))]<-"1"
+
+#Encoding(tweets$text[2])
+tweets$text <- iconv(tweets$text,from="UTF-8",to="ASCII//TRANSLIT")
+tweets$text <- str_replace_all(tweets$text, "'","") # Quitar virgulillas y acentos 
+tweets$text <- str_replace_all(tweets$text, "~","")
+tweets$text <- str_replace_all(tweets$text, "`","") 
+
+other_stop_words <- c("amlo","mananera")
+tweets$text <- str_replace_all(tweets$text, paste(other_stop_words, collapse = "|"), "")
+tweets$text <- str_trim(tweets$text) 
+tweets$text <- str_replace_all(tweets$text, "  ", " ") # remove double spaces
+
+tweets <- tweets %>% 
+  filter(text!="1") %>% 
+  mutate(num_car= nchar(text)) %>% 
+  filter(num_car>3) %>% # Remove tweets with less that three words 
+  dplyr::select(- num_car)
+
+# Imbalanced sample and wrong categories
+tweets %>%
+  count(category, sort = TRUE) %>%
+  dplyr::select(n, category)
+
+tweets <- tweets %>% 
+  filter(category == "M" | category == "B" | category == "N")
+
+# Document term matrix 
+# myCorpus <- Corpus(VectorSource(tweets$text))
+# myTDM <- DocumentTermMatrix(myCorpus, control = list(minWordLength = 1))
+# tweets_matrix <- as.matrix(myTDM)
+# tweets_matrix <- cbind(tweets %>% dplyr::select(category),tweets_matrix)
+# tweets_matrix$category <- as.factor(tweets_matrix$category)
+
+write_csv(tweets,"03_Output/tweets_clean.csv")
